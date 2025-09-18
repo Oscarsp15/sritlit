@@ -155,21 +155,27 @@ document.addEventListener('DOMContentLoaded', () => {
   let audioContext;
   let sourceNode;
   let gainNode;
+  let useNativeVolume = !AudioContextClass;
+  let warnedAboutNativeVolume = false;
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
   const updateDisplay = (value) => {
     const safeValue = clamp(Number(value) || 0, 0, 200);
-    volumeDisplay.textContent = `${safeValue}%`;
+    if (useNativeVolume && safeValue > 100) {
+      volumeDisplay.textContent = '100% (máximo)';
+    } else {
+      volumeDisplay.textContent = `${safeValue}%`;
+    }
     volumeSlider.setAttribute('aria-valuenow', String(safeValue));
   };
 
   const ensureAudioGraph = () => {
-    if (!AudioContextClass) {
-      if (typeof showToast === 'function') {
-        showToast('Tu navegador no soporta la amplificación avanzada de audio.', 'warning');
+    if (useNativeVolume) {
+      if (!AudioContextClass && !warnedAboutNativeVolume && typeof showToast === 'function') {
+        showToast('Tu navegador no soporta la amplificación avanzada de audio. Se usará el control de volumen estándar.', 'warning');
+        warnedAboutNativeVolume = true;
       }
-      volumeSlider.disabled = true;
       return false;
     }
     if (!audioContext) {
@@ -178,14 +184,19 @@ document.addEventListener('DOMContentLoaded', () => {
         sourceNode = audioContext.createMediaElementSource(audioElement);
       } catch (error) {
         console.error('No se pudo crear el contexto de audio:', error);
-        if (typeof showToast === 'function') {
-          showToast('No se pudo inicializar el control de volumen ampliado.', 'error');
+        audioContext = null;
+        sourceNode = null;
+        gainNode = null;
+        useNativeVolume = true;
+        if (!warnedAboutNativeVolume && typeof showToast === 'function') {
+          showToast('No se pudo inicializar el control de volumen ampliado. Se usará el control de volumen estándar.', 'warning');
+          warnedAboutNativeVolume = true;
         }
-        volumeSlider.disabled = true;
         return false;
       }
       gainNode = audioContext.createGain();
       sourceNode.connect(gainNode).connect(audioContext.destination);
+      audioElement.volume = 0;
     }
     if (audioContext.state === 'suspended') {
       audioContext.resume();
@@ -195,26 +206,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const applyGainFromSlider = (value) => {
     const normalized = clamp(Number(value) / 100, 0, 2);
-    if (gainNode) {
+    if (!useNativeVolume && gainNode) {
       gainNode.gain.value = normalized;
+      if (audioElement.volume !== 0) {
+        audioElement.volume = 0;
+      }
+    } else {
+      const fallbackVolume = clamp(normalized, 0, 1);
+      audioElement.volume = fallbackVolume;
     }
     updateDisplay(value);
   };
 
   volumeSlider.addEventListener('input', (event) => {
     const value = event.target.value;
-    if (!ensureAudioGraph()) {
-      return;
-    }
+    ensureAudioGraph();
     applyGainFromSlider(value);
   });
 
   audioElement.addEventListener('play', () => {
-    if (!ensureAudioGraph()) {
-      return;
-    }
+    ensureAudioGraph();
     applyGainFromSlider(volumeSlider.value);
   });
 
-  updateDisplay(volumeSlider.value);
+  applyGainFromSlider(volumeSlider.value);
 });
