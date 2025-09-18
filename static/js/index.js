@@ -141,3 +141,80 @@ function removeVideo() {
   removeBtn.disabled = true;
   showToast("Video ocultado. Puedes grabar de nuevo.", "info");
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const audioElement = document.querySelector('.audio-player');
+  const volumeSlider = document.getElementById('volume-slider');
+  const volumeDisplay = document.getElementById('volume-display');
+
+  if (!audioElement || !volumeSlider || !volumeDisplay) {
+    return;
+  }
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  let audioContext;
+  let sourceNode;
+  let gainNode;
+
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+  const updateDisplay = (value) => {
+    const safeValue = clamp(Number(value) || 0, 0, 200);
+    volumeDisplay.textContent = `${safeValue}%`;
+    volumeSlider.setAttribute('aria-valuenow', String(safeValue));
+  };
+
+  const ensureAudioGraph = () => {
+    if (!AudioContextClass) {
+      if (typeof showToast === 'function') {
+        showToast('Tu navegador no soporta la amplificación avanzada de audio.', 'warning');
+      }
+      volumeSlider.disabled = true;
+      return false;
+    }
+    if (!audioContext) {
+      audioContext = new AudioContextClass();
+      try {
+        sourceNode = audioContext.createMediaElementSource(audioElement);
+      } catch (error) {
+        console.error('No se pudo crear el contexto de audio:', error);
+        if (typeof showToast === 'function') {
+          showToast('No se pudo inicializar el control de volumen ampliado.', 'error');
+        }
+        volumeSlider.disabled = true;
+        return false;
+      }
+      gainNode = audioContext.createGain();
+      sourceNode.connect(gainNode).connect(audioContext.destination);
+    }
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    return true;
+  };
+
+  const applyGainFromSlider = (value) => {
+    const normalized = clamp(Number(value) / 100, 0, 2);
+    if (gainNode) {
+      gainNode.gain.value = normalized;
+    }
+    updateDisplay(value);
+  };
+
+  volumeSlider.addEventListener('input', (event) => {
+    const value = event.target.value;
+    if (!ensureAudioGraph()) {
+      return;
+    }
+    applyGainFromSlider(value);
+  });
+
+  audioElement.addEventListener('play', () => {
+    if (!ensureAudioGraph()) {
+      return;
+    }
+    applyGainFromSlider(volumeSlider.value);
+  });
+
+  updateDisplay(volumeSlider.value);
+});
