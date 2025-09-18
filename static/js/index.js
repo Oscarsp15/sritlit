@@ -207,9 +207,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const applyGainFromSlider = (value) => {
     const normalized = clamp(Number(value) / 100, 0, 2);
     if (!useNativeVolume && gainNode) {
-      gainNode.gain.value = normalized;
-      if (audioElement.volume !== 0) {
-        audioElement.volume = 0;
+      if (normalized <= 1) {
+        audioElement.volume = normalized;
+        gainNode.gain.value = 1;
+      } else {
+        audioElement.volume = 1;
+        gainNode.gain.value = normalized;
       }
     } else {
       const fallbackVolume = clamp(normalized, 0, 1);
