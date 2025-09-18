@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Configuración de Audio</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="wrap">
+    <header class="main-header" aria-label="Encabezado">
+      <div class="logo shadow" aria-hidden="true">🎙️</div>
+      <div>
+        <h1 class="contrast-title">Seleccionar Micrófono y Modo de Audio</h1>
+        <p class="sub">Elige el dispositivo de entrada y cómo quieres transmitir el audio.</p>
+      </div>
+    </header>
+
+    <form method="post" class="panel panel-config" aria-labelledby="form-title">
+      <h2 id="form-title">Configuración</h2>
+
+      <div class="row g-3">
+        <!-- Micrófono -->
+        <div class="col-12 col-md-6">
+          <div class="field">
+            <label for="device_index">Micrófono</label>
+            <select name="device_index" id="device_index" class="form-select" aria-describedby="device-hint">
+              <option value="" {% if current_device is none %}selected{% endif %}>
+                Predeterminado del sistema
+              </option>
+              {% for device in devices %}
+                <option value="{{ device.index }}" {% if device.index == current_device %}selected{% endif %}>
+                  {{ device.name }} · ID {{ device.index }} · {{ device.maxInputChannels }} ch
+                </option>
+              {% endfor %}
+            </select>
+            <div class="chips" id="device-meta">
+              {% if current_device is not none %}
+              <span class="chip">ID actual: {{ current_device }}</span>
+              {% endif %}
+              <span class="chip">{{ devices|length }} dispositivos detectados</span>
+            </div>
+            <span id="device-hint" class="hint">Sugerencia: si cambias micrófono del SO, “Predeterminado” te seguirá.</span>
+          </div>
+        </div>
+
+        <!-- Modo de audio -->
+        <div class="col-12 col-md-6">
+          <div class="field">
+            <label for="mode">Modo de Audio</label>
+            <select name="mode" id="mode" class="form-select" aria-describedby="mode-hint">
+              <option value="normal" {% if audio_mode == "normal" %}selected{% endif %}>Normal (Mono)</option>
+              <option value="ambient" {% if audio_mode == "ambient" %}selected{% endif %}>Ambient (Stereo)</option>
+            </select>
+            <div class="chips">
+              <span class="chip" id="channels-chip">
+                {% if audio_mode == "ambient" %}2 canales (estéreo){% else %}1 canal (mono){% endif %}
+              </span>
+              <span class="chip">44.1 kHz</span>
+              <span class="chip">16-bit PCM</span>
+            </div>
+            <span id="mode-hint" class="hint">“Ambient” graba en estéreo; “Normal” prioriza voz.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tester de audio -->
+      <div class="tester" aria-live="polite">
+        <div class="badge ok">Prueba rápida</div>
+        <div class="hint">Pulsa reproducir para verificar señal del micrófono seleccionado.</div>
+        <audio controls preload="none">
+          <source src="{{ url_for('audio_feed') }}" type="audio/wav" />
+          Tu navegador no soporta audio HTML5.
+        </audio>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Aplicar configuración</button>
+        <button type="button" class="btn" id="resetDefault">Restablecer a “Predeterminado”</button>
+        <a class="btn btn-ghost" href="{{ url_for('index') }}">Volver al streaming</a>
+      </div>
+    </form>
+
+    <div class="status">
+      <span class="badge">⚙️ Dispositivo:
+        <strong>{% if current_device is none %}Predeterminado{% else %}ID {{ current_device }}{% endif %}</strong>
+      </span>
+      <span class="badge {% if audio_mode == 'ambient' %}ok{% else %}warn{% endif %}">
+        🎧 Modo actual: <strong>{{ 'Ambient' if audio_mode == 'ambient' else 'Normal' }}</strong>
+      </span>
+    </div>
+  </div>
+
+  <div class="footerbar" role="contentinfo">
+    <div class="inner">
+      <a class="link-back" href="{{ url_for('index') }}">⟵ Volver al Streaming</a>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" onclick="submitForm()">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container for notifications -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    <div id="toast-container"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
